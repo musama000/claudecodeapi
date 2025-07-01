@@ -1,0 +1,11 @@
+{
+  "total_examples": 2,
+  "by_type": {
+    "mathematics": 2
+  },
+  "sources_scraped": [
+    "math_visualizations",
+    "physics_simulations",
+    "educational_collections"
+  ]
+}
