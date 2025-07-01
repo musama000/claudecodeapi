@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: threejs-rag-generator
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false  # Set this in Render dashboard
+      - key: PORT
+        value: 8000
