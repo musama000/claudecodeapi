@@ -1,8 +1,13 @@
 import os
-from typing import List, Dict
+import time
+from typing import List, Dict, Optional
 import chromadb
 from chromadb.utils import embedding_functions
 import hashlib
+from .smart_cache import SmartCache
+
+# Disable ChromaDB telemetry to avoid errors
+os.environ["ANONYMIZED_TELEMETRY"] = "False"
 
 class RAGEngine:
     def __init__(self, dataset_path: str):
@@ -15,6 +20,16 @@ class RAGEngine:
             name="threejs_docs",
             embedding_function=self.embedding_function
         )
+        
+        # Initialize smart cache
+        self.cache = SmartCache()
+        
+        # Performance metrics
+        self.metrics = {
+            "total_searches": 0,
+            "cache_hits": 0,
+            "avg_search_time": 0.0
+        }
     
     def index_documents(self):
         print(f"Indexing from path: {self.dataset_path}")
@@ -109,6 +124,24 @@ class RAGEngine:
             print("No documents found to index")
     
     def search(self, query: str, k: int = 3) -> List[Dict]:
+        start_time = time.time()
+        self.metrics["total_searches"] += 1
+        
+        # Try to get from cache first
+        cached_result = self.cache.get_rag_result(query)
+        if cached_result:
+            results, cache_metadata = cached_result
+            self.metrics["cache_hits"] += 1
+            
+            # Add cache metadata to results
+            for doc in results:
+                doc["cache_metadata"] = cache_metadata
+            
+            print(f"🚀 Cache hit ({cache_metadata['cache_hit']}): {cache_metadata.get('similarity', 1.0):.3f} similarity")
+            return results[:k]  # Return requested number of results
+        
+        # Perform actual search
+        print(f"🔍 Searching ChromaDB for: {query[:50]}...")
         results = self.collection.query(
             query_texts=[query],
             n_results=k
@@ -120,8 +153,56 @@ class RAGEngine:
                 doc = {
                     "content": results['documents'][0][i],
                     "metadata": results['metadatas'][0][i] if results['metadatas'] else {},
-                    "distance": results['distances'][0][i] if results['distances'] else 0
+                    "distance": results['distances'][0][i] if results['distances'] else 0,
+                    "cache_metadata": {"cache_hit": "miss"}
                 }
                 documents.append(doc)
         
+        # Cache the results for future use
+        search_time = time.time() - start_time
+        self.cache.cache_rag_result(query, documents, search_time)
+        
+        # Update metrics
+        self.metrics["avg_search_time"] = (
+            (self.metrics["avg_search_time"] * (self.metrics["total_searches"] - 1) + search_time) 
+            / self.metrics["total_searches"]
+        )
+        
+        print(f"⏱️  Search completed in {search_time:.3f}s")
         return documents
+    
+    def get_performance_stats(self) -> Dict:
+        """Get performance and cache statistics."""
+        cache_stats = self.cache.get_cache_stats()
+        
+        return {
+            "rag_metrics": self.metrics,
+            "cache_stats": cache_stats,
+            "hit_rate": self.metrics["cache_hits"] / max(self.metrics["total_searches"], 1),
+            "performance_improvement": {
+                "avg_cached_time": cache_stats.get("avg_response_time", 0),
+                "avg_search_time": self.metrics["avg_search_time"],
+                "speedup_factor": self.metrics["avg_search_time"] / max(cache_stats.get("avg_response_time", 1), 0.001)
+            }
+        }
+    
+    def warm_cache(self):
+        """Warm up the cache with common ThreeJS queries."""
+        common_queries = [
+            "create rotating cube with lighting",
+            "sphere geometry with texture mapping", 
+            "particle system with animation",
+            "camera controls and orbit",
+            "vector field visualization",
+            "3D mathematical function plotting",
+            "physics simulation bouncing balls",
+            "wireframe geometry examples",
+            "material properties and shaders",
+            "scene lighting setup directional ambient"
+        ]
+        
+        print("🔥 Warming up RAG cache...")
+        for query in common_queries:
+            self.search(query, k=3)
+        
+        self.cache.warm_cache(common_queries)

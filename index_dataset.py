@@ -7,10 +7,6 @@ def main():
     # Load environment variables
     load_dotenv()
     
-    # Check if GEMINI_API_KEY is set (needed for the app, though not for indexing)
-    if not os.getenv("GEMINI_API_KEY"):
-        print("Warning: GEMINI_API_KEY not set in .env file")
-        print("You'll need to set it before using the /generate endpoint")
     
     print("Starting dataset indexing...")
     

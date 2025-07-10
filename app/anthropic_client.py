@@ -1,8 +1,10 @@
 import os
 import asyncio
+import time
 from typing import Dict, Optional
 import anthropic
 from anthropic import AsyncAnthropic
+from rag.smart_cache import SmartCache
 
 class AnthropicClient:
     def __init__(self):
@@ -11,13 +13,13 @@ class AnthropicClient:
             raise ValueError("ANTHROPIC_API_KEY environment variable not set")
         
         self.client = AsyncAnthropic(api_key=api_key)
-        print("Using Claude Sonnet 4 model")
+        print("Using Claude Sonnet 5 model")
     
     async def generate_threejs_code(
         self, 
         prompt: str, 
         context: Optional[str] = None,
-        temperature: float = 0.7
+        temperature: float = 0.4
     ) -> Dict[str, str]:
         system_prompt = """You are an expert educational Three.js developer creating STEM visualizations for a pre-configured execution environment.
 
@@ -51,13 +53,17 @@ CONTROL SYSTEM FUNCTIONS:
 - clearControls() - removes all existing UI controls
 - showControls() - makes control panel visible
 - hideControls() - hides control panel
-- addSlider(label, min, max, defaultValue, callback) - adds interactive slider
+- addSlider(label, min, max, defaultValue, callback, step) - adds interactive slider with optional step
+  * step is optional - if not provided, intelligent defaults are used:
+  * Integer ranges (e.g., 1-100): step = 1
+  * Small decimal ranges (e.g., 0-1): step = 0.01
+  * Rotation/speed values: step = 0.001 or 0.01
 - addDropdown(label, optionsArray, callback) - adds dropdown menu
 
 REQUIRED CODE STRUCTURE:
 ```javascript
 // 1. Configure existing scene (required)
-scene.background = new THREE.Color(0xf0f0f0);
+scene.background = new THREE.Color(0x79ecff);
 camera.position.set(5, 5, 5);
 camera.lookAt(0, 0, 0);
 
@@ -117,6 +123,7 @@ CRITICAL CODE QUALITY RULES:
 4. DEPENDENT UPDATES: When a control changes a value (like size), update ALL dependent elements (geometry, edges, labels, etc).
 5. NO PARTIAL IMPLEMENTATIONS: Complete every feature mentioned. No comments like "// Add similarly" or try/catch blocks that silently skip functionality.
 6. PROPER SCOPE: Declare shared variables at the top scope, not inside functions, if they need to be accessed by multiple functions or controls.
+7. ALWAYS INCLUDE HELPER FUNCTIONS: If using createVector, createParticle, or plotFunction, ALWAYS define them in your code before using them.
 
 Example of proper cleanup:
 // Before creating new objects
@@ -132,7 +139,7 @@ SYNTAX ERROR PREVENTION:
 ✅ let myVar; // Use let if value comes later
 
 ❌ labelA.textContent = 'text'; // Undefined variable reference
-✅ const labelA = createTextLabel('text', position); // Proper variable declaration
+✅ const mesh = new THREE.Mesh(geometry, material); // Proper variable declaration
 
 ❌ new OrbitControls(camera, renderer.domElement); // Missing THREE prefix
 ✅ new THREE.OrbitControls(camera, renderer.domElement); // Correct addon usage
@@ -149,12 +156,12 @@ let elementType = 0; // Index for dropdown options
 let scaleValue = 1.0;
 let speedMultiplier = 1.0;
 
-// Add controls with proper callbacks
+// Add controls with proper callbacks and appropriate steps
 addSlider('Element Count', 1, 100, numElements, (value) => {
     numElements = parseInt(value);
     console.log('📊 Element count:', numElements);
     updateVisualization();
-});
+}, 1); // Integer step for countable objects
 
 addDropdown('Element Type', ['Spheres', 'Cubes', 'Cylinders'], (value) => {
     elementType = parseInt(value);
@@ -162,11 +169,16 @@ addDropdown('Element Type', ['Spheres', 'Cubes', 'Cylinders'], (value) => {
     updateVisualization();
 });
 
-addSlider('Scale', 0.1, 2.0, scaleValue, (value) => {
+addSlider('Scale', 0.1, 5.0, scaleValue, (value) => {
     scaleValue = parseFloat(value);
     console.log('📏 Scale:', scaleValue);
     updateVisualization();
-});
+}, 0.1); // Decimal step for continuous values
+
+addSlider('Rotation Speed', 0, 0.1, speedMultiplier, (value) => {
+    speedMultiplier = parseFloat(value);
+    console.log('🔄 Speed:', speedMultiplier);
+}, 0.001); // Fine step for precise rotation control
 
 // Update function with cleanup
 function updateVisualization() {
@@ -183,7 +195,7 @@ function updateVisualization() {
 updateVisualization();
 ```
 
-TEXT/LABEL CREATION PATTERN:
+TEXT/LABEL CREATION (only use if specifically requested):
 ```javascript
 // Use provided canvas for text rendering
 function createTextLabel(text, position, color = '#000000') {
@@ -302,6 +314,7 @@ Return EXACTLY in this format:
 CODE:
 ```javascript
 // Your scene manipulation code here (NO wrapping, NO new scene/camera/renderer)
+// Include helper function definitions only if you use them
 ```
 
 FINAL CHECKLIST:
@@ -313,7 +326,8 @@ FINAL CHECKLIST:
 ✅ Controls.update() called in animation loop
 ✅ Console.log statements for debugging
 ✅ Try-catch blocks around risky operations
-✅ Proper object cleanup in update functions"""
+✅ Proper object cleanup in update functions
+✅ Helper functions (createVector, createParticle, plotFunction) defined before use"""
         
         # Add educational context to reduce safety filter triggers
         educational_prefix = "Create an educational Three.js visualization for learning purposes. "
@@ -330,8 +344,8 @@ FINAL CHECKLIST:
         
         try:
             response = await self.client.messages.create(
-                model="claude-opus-4-20250514",
-                max_tokens=8192,
+                model="claude-sonnet-4-20250514",
+                max_tokens=4096,
                 temperature=temperature,
                 messages=[
                     {"role": "user", "content": full_prompt}

@@ -1,0 +1,13 @@
+
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ANONYMIZED_TELEMETRY=False
+    volumes:
+      - ./app/chroma_db:/app/chroma_db
+      - ./dataset:/app/dataset
+    restart: unless-stopped

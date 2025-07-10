@@ -16,8 +16,8 @@
 2. **Check for File Corruption**
    ```bash
    # Check if main files exist and have content
-   ls -la main.py app/gemini_client.py
-   head -5 main.py app/gemini_client.py
+   ls -la main.py app/anthropic_client.py
+   head -5 main.py app/anthropic_client.py
    ```
 
 3. **Restart the Server**
@@ -34,12 +34,12 @@
 
 ### Common Issues and Solutions
 
-#### 1. Import Error (Cannot import GeminiClient)
+#### 1. Import Error (Cannot import ClaudeClient)
 **Symptoms:** Server won't start, ImportError in logs
 **Solution:**
 ```bash
 # Check if class exists in file
-grep -n "class GeminiClient" app/gemini_client.py
+grep -n "class ClaudeClient" app/anthropic_client.py
 # If missing, restore from backup or rebuild
 ```
 
@@ -48,16 +48,16 @@ grep -n "class GeminiClient" app/gemini_client.py
 **Solution:**
 ```bash
 # Switch to different model or adjust safety settings
-# Edit app/gemini_client.py and change model to 'gemini-2.0-flash-exp'
+# Edit app/anthropic_client.py and change model to 'gemini-2.0-flash-exp'
 ```
 
 #### 3. API Key Issues
-**Symptoms:** "GEMINI_API_KEY not set" error
+**Symptoms:** "ANTHROPIC_API_KEY not set" error
 **Solution:**
 ```bash
 # Check if API key is set
 cat .env.example
-# Should contain: GEMINI_API_KEY=your_key_here
+# Should contain: ANTHROPIC_API_KEY=your_key_here
 ```
 
 #### 4. Port Already in Use
@@ -93,7 +93,7 @@ pkill -f uvicorn
 rm -rf chroma_db/ server.log
 
 # 3. Check core files
-ls -la main.py app/gemini_client.py rag/rag_engine.py
+ls -la main.py app/anthropic_client.py rag/rag_engine.py
 
 # 4. Reinstall dependencies (if needed)
 pip3 install --upgrade fastapi uvicorn python-multipart pydantic google-generativeai chromadb python-dotenv
@@ -143,7 +143,7 @@ threejs-rag-generator/
 ├── index_dataset.py       # Indexing script
 ├── app/
 │   ├── __init__.py
-│   └── gemini_client.py   # AI client
+│   └── anthropic_client.py   # AI client
 ├── rag/
 │   ├── __init__.py
 │   └── rag_engine.py      # Vector search
@@ -179,7 +179,7 @@ curl -s http://localhost:8000/health | grep -q "healthy" && echo "✅ API respon
 
 echo "3. Checking files..."
 [ -f main.py ] && echo "✅ main.py exists" || echo "❌ main.py missing"
-[ -f app/gemini_client.py ] && echo "✅ gemini_client.py exists" || echo "❌ gemini_client.py missing"
+[ -f app/anthropic_client.py ] && echo "✅ anthropic_client.py exists" || echo "❌ anthropic_client.py missing"
 
 echo "4. Checking database..."
 [ -d chroma_db ] && echo "✅ Database exists" || echo "❌ Database missing"
